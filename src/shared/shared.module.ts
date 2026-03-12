@@ -1,11 +1,10 @@
 import { Global, Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { GroupsModule } from '../groups/groups.module';
 import { ApiKeyGuard } from './guards/api-key.guard';
-import { StudentGroup } from '../groups/entities/student-group.entity';
 
 @Global()
 @Module({
-  imports: [TypeOrmModule.forFeature([StudentGroup])],
+  imports: [GroupsModule],
   providers: [ApiKeyGuard],
   exports: [ApiKeyGuard],
 })

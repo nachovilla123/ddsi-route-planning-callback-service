@@ -5,6 +5,7 @@ import { GroupsModule } from './groups/groups.module';
 import { IngestionModule } from './ingestion/ingestion.module';
 import { PlanningModule } from './planning/planning.module';
 import { DispatchModule } from './dispatch/dispatch.module';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { DispatchModule } from './dispatch/dispatch.module';
     IngestionModule,
     PlanningModule,
     DispatchModule,
+    DatabaseModule,
   ],
 })
 export class AppModule {}

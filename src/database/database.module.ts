@@ -19,6 +19,7 @@ import { WebhookOutbox } from '../dispatch/entities/webhook-outbox.entity';
         password: config.get<string>('DB_PASS', 'postgres'),
         database: config.get<string>('DB_NAME', 'route_generator'),
         entities: [StudentGroup, RoutingRequest, WebhookOutbox],
+        //todo: si llego, configurar migrations y sacar el synchronize.
         synchronize: true,
       }),
     }),

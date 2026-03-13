@@ -13,8 +13,10 @@ export class RoutingRequest {
   @PrimaryColumn('uuid')
   id: string;
 
-  @Column({ name: 'api_key', type: 'uuid' })
-  apiKey: string;
+
+  //TODO: cambiar a many to one??
+  @Column({ name: 'group_id', type: 'uuid' })
+  groupId: string;
 
   @Column({ type: 'jsonb' })
   payload: RoutingPayload;

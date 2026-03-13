@@ -2,12 +2,12 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
 } from 'typeorm';
 
 @Entity({ name: 'student_groups' })
 export class StudentGroup {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn('uuid')
   id: string;
 
   @Column({ name: 'api_key', unique: true, type: 'uuid' })

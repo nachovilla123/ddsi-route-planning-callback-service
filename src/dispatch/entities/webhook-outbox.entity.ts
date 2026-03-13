@@ -2,7 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
 } from 'typeorm';
 import { WebhookStatus } from './webhook-status.enum';
 
@@ -14,26 +14,27 @@ import { WebhookStatus } from './webhook-status.enum';
 //? tabla podemos asegurarnos de que eventualmente serán entregados, incluso si hay fallos temporales.
 @Entity('webhook_outbox')
 export class WebhookOutbox {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn('uuid')
   id: string;
 
+  //TODO: cambiar a many to one??
   @Column({ name: 'request_id', type: 'uuid' })
   requestId: string;
 
-  @Column({ name: 'api_key', type: 'uuid' })
-  apiKey: string;
+  @Column({ name: 'group_id', type: 'uuid' })
+  groupId: string;
 
   @Column({ type: 'jsonb' })
   payload: Record<string, unknown>;
 
-  @Column({
-    type: 'varchar',
-    length: 20,
+ @Column({
+    type: 'enum',
+    enum: WebhookStatus,
     default: WebhookStatus.PENDING,
   })
   status: WebhookStatus;
 
-  @Column({ name: 'retry_count', default: 0 })
+  @Column({ name: 'retry_count', type: 'int', default: 0 })
   retryCount: number;
 
   @Column({ name: 'last_attempt_at', type: 'timestamptz', nullable: true })

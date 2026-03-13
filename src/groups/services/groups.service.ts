@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { StudentGroup } from '../entities/student-group.entity';
 import { RegisterGroupDto } from '../dtos/register-group.dto';
 import { RegisterGroupResponseDto } from '../dtos/register-group-response.dto';
-import { randomBytes } from 'crypto';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class GroupsService {
@@ -14,7 +14,7 @@ export class GroupsService {
   ) {}
 
   async createGroup(dto: RegisterGroupDto): Promise<RegisterGroupResponseDto> {
-    const clientSecret = randomBytes(32).toString('hex');
+    const clientSecret = crypto.randomBytes(32).toString('hex');
 
     const apiKey = crypto.randomUUID();
 

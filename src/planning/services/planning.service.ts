@@ -93,7 +93,7 @@ export class PlanningService {
           [
             randomUUID(),
             req.id,
-            req.apiKey,
+            req.groupId,
             JSON.stringify(outboxPayload),
             WebhookStatus.PENDING,
           ],

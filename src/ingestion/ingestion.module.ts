@@ -4,9 +4,11 @@ import { RoutingRequest } from './entities/routing-request.entity';
 import { StudentGroup } from '../groups/entities/student-group.entity';
 import { IngestionService } from './services/ingestion.service';
 import { IngestionController } from './controllers/ingestion.controller';
+import { GroupsModule } from '../groups/groups.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RoutingRequest, StudentGroup])],
+  imports: [TypeOrmModule.forFeature([RoutingRequest, StudentGroup]),
+   GroupsModule],
   controllers: [IngestionController],
   providers: [IngestionService],
 })

@@ -39,12 +39,12 @@ export class DispatchService {
 
       const groups: StudentGroup[] = await runner.query(
         `SELECT * FROM student_groups WHERE id = $1`,
-        [outbox.apiKey],
+        [outbox.groupId],
       );
 
       const group = groups[0];
       if (!group) {
-        this.logger.warn(`No group found for api_key ${outbox.apiKey}`);
+        this.logger.warn(`No group found for id ${outbox.groupId}`);
         return;
       }
 

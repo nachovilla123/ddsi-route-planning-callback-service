@@ -19,7 +19,7 @@ export class IngestionService {
 
   async saveRoutingRequest(
     dto: PlanRouteDto,
-    apiKey: string,
+    groupId: string,
   ): Promise<PlanRouteResponseDto> {
     const existing = await this.requestsRepo.findOneBy({ id: dto.requestId });
     if (existing) {
@@ -28,7 +28,7 @@ export class IngestionService {
 
     const request = this.requestsRepo.create({
       id: dto.requestId,
-      apiKey,
+      groupId: groupId,
       payload: {
         warehouse: dto.warehouse,
         deliveries: dto.deliveries,

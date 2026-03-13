@@ -7,6 +7,9 @@ import { PlanningModule } from './planning/planning.module';
 import { DispatchModule } from './dispatch/dispatch.module';
 import { DatabaseModule } from './database/database.module';
 
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
 @Module({
   imports: [
     ScheduleModule.forRoot(),
@@ -17,5 +20,7 @@ import { DatabaseModule } from './database/database.module';
     DispatchModule,
     DatabaseModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

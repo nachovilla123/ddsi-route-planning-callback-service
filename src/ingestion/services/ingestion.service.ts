@@ -37,11 +37,13 @@ export class IngestionService {
     return { requestId: saved.id, status: saved.status };
   }
 
+  //? DOCS: esto permite actualizar la callback del webhook, se utilizan los guards para buscar el grupo.
   async updateCallbackUrl(
-    apiKey: string,
+    group: StudentGroup,
     callbackUrl: string,
   ): Promise<UpdateCallbackResponseDto> {
-    await this.groupsRepo.update({ id: apiKey }, { callbackUrl });
+    await this.groupsRepo.update({ id: group.id }, { callbackUrl });
+
     return { callbackUrl };
   }
 }

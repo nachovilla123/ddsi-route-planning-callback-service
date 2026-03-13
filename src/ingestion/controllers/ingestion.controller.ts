@@ -34,6 +34,6 @@ export class IngestionController {
     @Body() dto: UpdateCallbackDto,
     @CurrentGroup() group: StudentGroup,
   ): Promise<UpdateCallbackResponseDto> {
-    return this.ingestionService.updateCallbackUrl(group.id, dto.callbackUrl);
+    return this.ingestionService.updateCallbackUrl(group, dto.callbackUrl);
   }
 }

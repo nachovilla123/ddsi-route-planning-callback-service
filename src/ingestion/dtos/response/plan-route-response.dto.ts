@@ -1,4 +1,4 @@
-import { RoutingStatus } from '../entities/routing-request.entity';
+import { RoutingStatus } from '../../entities/routing-status.enum';
 
 export class PlanRouteResponseDto {
   requestId: string;

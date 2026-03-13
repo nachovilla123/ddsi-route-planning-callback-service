@@ -1,4 +1,6 @@
 services:
+
+# TODO: hardcodear credenciales db para alumnos
   db:
     image: postgres:16-alpine
     container_name: route_generator_db
@@ -35,6 +37,28 @@ services:
         condition: service_healthy
     networks:
       - route-network
+  
+  #TODO: app port en .env
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: route-generator-api
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - route-network    
 
 volumes:
   pgdata:

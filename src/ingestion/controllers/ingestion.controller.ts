@@ -3,6 +3,7 @@ import {
   Controller,
   HttpCode,
   Post,
+  Get,
   UseGuards,
 } from '@nestjs/common';
 import { ApiKeyGuard } from '../../shared/guards/api-key.guard';
@@ -12,12 +13,12 @@ import { PlanRouteDto } from '../dtos/request/plan-route.dto';
 import { PlanRouteResponseDto } from '../dtos/response/plan-route-response.dto';
 import { StudentGroup } from '../../groups/entities/student-group.entity';
 
-@Controller()
+@Controller('plan-route')
 @UseGuards(ApiKeyGuard)
 export class IngestionController {
   constructor(private readonly ingestionService: IngestionService) {}
 
-  @Post('plan-route')
+  @Post()
   @HttpCode(202)
   planRoute(
     @Body() dto: PlanRouteDto,
@@ -25,4 +26,9 @@ export class IngestionController {
   ): Promise<PlanRouteResponseDto> {
     return this.ingestionService.saveRoutingRequest(dto, group.id);
   }
+
+  // TODO: 
+  // @Get(":id")
+  // @HttpCode(200)
+  // getPlannedRoute()
 }

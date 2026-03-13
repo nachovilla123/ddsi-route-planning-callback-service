@@ -8,7 +8,7 @@ import { ApiKeyGuard } from '../../shared/guards/api-key.guard';
 import { CurrentGroup } from '../../shared/decorators/current-group.decorator';
 import { StudentGroup } from '../entities/student-group.entity';
 
-@Controller('/groups')
+@Controller('groups')
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 

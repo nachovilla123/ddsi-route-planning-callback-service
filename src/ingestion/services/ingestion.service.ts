@@ -29,7 +29,11 @@ export class IngestionService {
     const request = this.requestsRepo.create({
       id: dto.requestId,
       apiKey,
-      payload: dto as unknown as Record<string, unknown>,
+      payload: {
+        warehouse: dto.warehouse,
+        deliveries: dto.deliveries,
+        trucks: dto.trucks,
+      },
       status: RoutingStatus.PENDING,
     });
     const saved = await this.requestsRepo.save(request);

@@ -47,13 +47,27 @@ export class PlanningService {
       await runner.commitTransaction();
 
       // Run VRP in worker thread (outside transaction to avoid holding the lock)
-      const payload = req.payload as unknown as Record<string, unknown>;
+      const { warehouse, deliveries, trucks } = req.payload;
 
-      //todo: revisar
+      //todo revisar: esto lo mapea a la clase porque estaba embebido.
       const routePlanningResult = await this.vrpWorker.run(
-        payload.deposito,
-        payload.entregas,
-        payload.camiones,
+        {
+          lat: warehouse.latitude,
+          lon: warehouse.longitude,
+          address: warehouse.address,
+        },
+        deliveries.map((d) => ({
+          deliveryCode: d.deliveryCode,
+          lat: d.latitude,
+          lon: d.longitude,
+          weightKg: d.WeightKg,
+          volumeM3: d.VolumeM3,
+        })),
+        trucks.map((t) => ({
+          truckId: t.truckId,
+          weightCapacityKg: t.WeightCapacityKg,
+          volumeCapacityM3: t.VolumeCapacityM3,
+        })),
       );
 
       const runner2 = this.dataSource.createQueryRunner();

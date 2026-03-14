@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 @Entity({ name: 'student_groups' })
@@ -24,4 +25,7 @@ export class StudentGroup {
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
+  updatedAt: Date;
 }

@@ -13,7 +13,6 @@ export class RoutingRequest {
   @PrimaryColumn('uuid')
   id: string;
 
-
   //TODO: cambiar a many to one??
   @Column({ name: 'group_id', type: 'uuid' })
   groupId: string;

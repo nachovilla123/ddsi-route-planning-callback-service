@@ -1,6 +1,4 @@
-// TODO: Migrate VRP algorithm from class-diagram.puml
-// Nearest-neighbor greedy algorithm for Vehicle Routing Problem
-import { haversine } from "./haversine";
+import { haversine } from './haversine';
 import { randomUUID } from 'crypto';
 
 export interface Delivery {
@@ -34,91 +32,122 @@ export interface PlanningResult {
   unassignedDeliveries: Array<{ deliveryCode: string; reason: string }>;
 }
 
+interface TruckCapacity {
+  remainingWeightKg: number;
+  remainingVolumeM3: number;
+}
+
+interface Location {
+  lat: number;
+  lon: number;
+}
+
+function fitsInTruck(delivery: Delivery, capacity: TruckCapacity): boolean {
+  return (
+    delivery.weightKg <= capacity.remainingWeightKg &&
+    delivery.volumeM3 <= capacity.remainingVolumeM3
+  );
+}
+
+function findNearestFittingDeliveryIndex(
+  candidates: Delivery[],
+  currentLocation: Location,
+  capacity: TruckCapacity,
+): number {
+  let nearestIndex = -1;
+  let minDistance = Infinity;
+
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+
+    if (!fitsInTruck(candidate, capacity)) continue;
+
+    const dist = haversine(
+      currentLocation.lat,
+      currentLocation.lon,
+      candidate.lat,
+      candidate.lon,
+    );
+
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearestIndex = i;
+    }
+  }
+
+  return nearestIndex;
+}
+
+function buildRouteForTruck(
+  truck: Truck,
+  warehouse: Warehouse,
+  unassignedPool: Delivery[],
+): RouteResult | null {
+  let currentLocation: Location = { lat: warehouse.lat, lon: warehouse.lon };
+  const capacity: TruckCapacity = {
+    remainingWeightKg: truck.weightCapacityKg,
+    remainingVolumeM3: truck.volumeCapacityM3,
+  };
+
+  const stops: Array<{ stopNumber: number; deliveryCode: string }> = [];
+  let stopCounter = 1;
+
+  while (unassignedPool.length > 0) {
+    const nearestIndex = findNearestFittingDeliveryIndex(
+      unassignedPool,
+      currentLocation,
+      capacity,
+    );
+
+    if (nearestIndex === -1) break;
+
+    const selected = unassignedPool[nearestIndex];
+
+    stops.push({
+      stopNumber: stopCounter++,
+      deliveryCode: selected.deliveryCode,
+    });
+
+    currentLocation = { lat: selected.lat, lon: selected.lon };
+    capacity.remainingWeightKg -= selected.weightKg;
+    capacity.remainingVolumeM3 -= selected.volumeM3;
+
+    unassignedPool.splice(nearestIndex, 1);
+  }
+
+  if (stops.length === 0) return null;
+
+  return {
+    truckId: truck.truckId,
+    assignedRouteId: `route_${randomUUID()}`,
+    stops,
+  };
+}
+
+function markUnassigned(
+  leftoverDeliveries: Delivery[],
+): Array<{ deliveryCode: string; reason: string }> {
+  return leftoverDeliveries.map((d) => ({
+    deliveryCode: d.deliveryCode,
+    reason: 'Capacity exceeded or insufficient trucks available',
+  }));
+}
+
 export function planRoutes(
   warehouse: Warehouse,
   deliveries: Delivery[],
   trucks: Truck[],
 ): PlanningResult {
-  console.log('Planning routes with Greedy Nearest-Neighbor algorithm', {
-    warehouse,
-    deliveries,
-    trucks,
-  });
-  const unassignedDeliveriesPool = [...deliveries];
+  const unassignedPool = [...deliveries];
   const routes: RouteResult[] = [];
-  const unassignedDeliveriesResult: Array<{ deliveryCode: string; reason: string }> = [];
 
   for (const truck of trucks) {
-    let currentLat = warehouse.lat;
-    let currentLon = warehouse.lon;
-    let remainingWeight = truck.weightCapacityKg;
-    let remainingVolume = truck.volumeCapacityM3;
-
-    const stops: Array<{ stopNumber: number; deliveryCode: string }> = [];
-    let stopCounter = 1;
-
-    while (unassignedDeliveriesPool.length > 0) {
-      let nearestDeliveryIndex = -1;
-      let minDistance = Infinity;
-
-      for (let i = 0; i < unassignedDeliveriesPool.length; i++) {
-        const candidate = unassignedDeliveriesPool[i];
-
-        if (
-          candidate.weightKg <= remainingWeight &&
-          candidate.volumeM3 <= remainingVolume
-        ) {
-          const dist = haversine(
-            currentLat,
-            currentLon,
-            candidate.lat,
-            candidate.lon,
-          );
-
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearestDeliveryIndex = i;
-          }
-        }
-      }
-
-      if (nearestDeliveryIndex === -1) {
-        break;
-      }
-
-      const selectedDelivery = unassignedDeliveriesPool[nearestDeliveryIndex];
-
-      stops.push({
-        stopNumber: stopCounter++,
-        deliveryCode: selectedDelivery.deliveryCode,
-      });
-
-      currentLat = selectedDelivery.lat;
-      currentLon = selectedDelivery.lon;
-      remainingWeight -= selectedDelivery.weightKg;
-      remainingVolume -= selectedDelivery.volumeM3;
-
-      unassignedDeliveriesPool.splice(nearestDeliveryIndex, 1);
-    }
-
-    if (stops.length > 0) {
-      routes.push({
-        truckId: truck.truckId,
-        assignedRouteId: `route_${randomUUID()}`,
-        stops: stops,
-      });
-    }
-  }
-
-  for (const leftover of unassignedDeliveriesPool) {
-    unassignedDeliveriesResult.push({
-      deliveryCode: leftover.deliveryCode,
-      reason: 'Capacity exceeded or insufficient trucks available',
-    });
+    const route = buildRouteForTruck(truck, warehouse, unassignedPool);
+    if (route) routes.push(route);
   }
 
   return {
     routes,
-    unassignedDeliveries: unassignedDeliveriesResult,
+    unassignedDeliveries: markUnassigned(unassignedPool),
   };
 }

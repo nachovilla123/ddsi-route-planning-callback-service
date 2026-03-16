@@ -36,6 +36,4 @@ export class IngestionService {
 
     return { requestId: saved.id, status: saved.status };
   }
-
-
 }

@@ -7,8 +7,10 @@ import { IngestionController } from './controllers/ingestion.controller';
 import { GroupsModule } from '../groups/groups.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RoutingRequest, StudentGroup]),
-   GroupsModule],
+  imports: [
+    TypeOrmModule.forFeature([RoutingRequest, StudentGroup]),
+    GroupsModule,
+  ],
   controllers: [IngestionController],
   providers: [IngestionService],
 })

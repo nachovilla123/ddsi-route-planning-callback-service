@@ -22,4 +22,4 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   await app.listen(envConfig.port);
 }
-bootstrap();
+bootstrap().catch(console.error);

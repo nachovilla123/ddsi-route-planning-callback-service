@@ -1,50 +1,79 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryRunner, Repository } from 'typeorm';
 import { WebhookOutbox } from '../entities/webhook-outbox.entity';
 import { StudentGroup } from '../../groups/entities/student-group.entity';
 import { sign } from '../utils/hmac-signer';
 import { nextAttemptAt } from '../utils/backoff';
 import { WebhookStatus } from '../entities/webhook-status.enum';
+import { InjectRepository } from '@nestjs/typeorm';
 
 const MAX_RETRIES = 5;
+
+interface RawOutbox {
+  id: string;
+  group_id: string;
+  payload: any;
+  retry_count: number;
+  next_attempt_at: Date;
+}
 
 @Injectable()
 export class DispatchService {
   private readonly logger = new Logger(DispatchService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    @InjectRepository(WebhookOutbox)
+    private readonly outboxRepo: Repository<WebhookOutbox>,
+    @InjectRepository(StudentGroup)
+    private readonly groupRepo: Repository<StudentGroup>,
+  ) {}
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async dispatchNext(): Promise<void> {
-    const runner = this.dataSource.createQueryRunner();
+    const runner: QueryRunner = this.dataSource.createQueryRunner();
     await runner.connect();
     await runner.startTransaction();
+
+    let outbox: RawOutbox | null = null;
+
     try {
-      const rows: WebhookOutbox[] = await runner.query(
+      const rows = (await runner.query(
         `SELECT * FROM webhook_outbox
          WHERE status = 'PENDING' AND next_attempt_at <= NOW()
          ORDER BY next_attempt_at ASC
          LIMIT 1
          FOR UPDATE SKIP LOCKED`,
-      );
+      )) as unknown as RawOutbox[];
 
       if (!rows.length) {
         await runner.rollbackTransaction();
         return;
       }
 
-      const outbox = rows[0];
+      outbox = rows[0];
+
       await runner.commitTransaction();
+    } catch (err) {
+      await runner.rollbackTransaction();
+      this.logger.error('Error al leer de webhook_outbox', err);
+      return;
+    } finally {
+      await runner.release();
+    }
 
-      const groups: StudentGroup[] = await runner.query(
-        `SELECT * FROM student_groups WHERE id = $1`,
-        [outbox.groupId],
-      );
+    if (!outbox) return;
 
-      const group = groups[0];
+    try {
+      const group = await this.groupRepo.findOneBy({ id: outbox.group_id });
+
       if (!group) {
-        this.logger.warn(`No group found for id ${outbox.groupId}`);
+        this.logger.warn(`No group found for id ${outbox.group_id}`);
+        await this.dataSource.query(
+          `UPDATE webhook_outbox SET status = $1 WHERE id = $2`,
+          [WebhookStatus.FAILED, outbox.id],
+        );
         return;
       }
 
@@ -63,33 +92,29 @@ export class DispatchService {
         });
         delivered = response.ok;
       } catch {
-        delivered = false;
+        delivered = false; // El servidor del alumno está apagado o no resuelve el DNS
       }
 
       if (delivered) {
-        await this.dataSource.query(
-          `UPDATE webhook_outbox SET status = $1 WHERE id = $2`,
-          [WebhookStatus.DELIVERED, outbox.id],
-        );
+        await this.outboxRepo.update(outbox.id, {
+          status: WebhookStatus.DELIVERED,
+        });
       } else {
-        const newRetryCount = outbox.retryCount + 1;
+        const newRetryCount = outbox.retry_count + 1;
         if (newRetryCount >= MAX_RETRIES) {
-          await this.dataSource.query(
-            `UPDATE webhook_outbox SET status = $1, retry_count = $2 WHERE id = $3`,
-            [WebhookStatus.FAILED, newRetryCount, outbox.id],
-          );
+          await this.outboxRepo.update(outbox.id, {
+            status: WebhookStatus.FAILED,
+            retryCount: newRetryCount,
+          });
         } else {
-          await this.dataSource.query(
-            `UPDATE webhook_outbox SET retry_count = $1, next_attempt_at = $2 WHERE id = $3`,
-            [newRetryCount, nextAttemptAt(newRetryCount), outbox.id],
-          );
+          await this.outboxRepo.update(outbox.id, {
+            retryCount: newRetryCount,
+            nextAttemptAt: nextAttemptAt(newRetryCount),
+          });
         }
       }
     } catch (err) {
-      await runner.rollbackTransaction();
       this.logger.error('Dispatch error', err);
-    } finally {
-      await runner.release();
     }
   }
 }

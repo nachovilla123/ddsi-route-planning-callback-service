@@ -5,14 +5,14 @@ import {
 } from 'class-validator';
 
 export function IsLatitude(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidLatitude',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: any, _args: ValidationArguments) {
           return typeof value === 'number' && value >= -90 && value <= 90;
         },
         defaultMessage(args: ValidationArguments) {
@@ -24,14 +24,14 @@ export function IsLatitude(validationOptions?: ValidationOptions) {
 }
 
 export function IsLongitude(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isValidLongitude',
       target: object.constructor,
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate(value: any, args: ValidationArguments) {
+        validate(value: any, _args: ValidationArguments) {
           return typeof value === 'number' && value >= -180 && value <= 180;
         },
         defaultMessage(args: ValidationArguments) {

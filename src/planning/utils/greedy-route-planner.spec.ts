@@ -31,12 +31,15 @@ import { planRoutes } from './greedy-route-planner';
 // Cero Entregas: Le mandas camiones, pero ninguna entrega. Debe devolver todo vacío sin crashear.
 
 describe('Greedy Route Planner (VRP)', () => {
-  
   it('debería asignar todas las rutas correctamente en el Happy Path', () => {
     // 1. Arrange (Preparar datos)
     const warehouse = { lat: -34.6037, lon: -58.3816, address: 'Centro' };
-    const deliveries = [ /* ... tu array ... */ ];
-    const trucks = [ /* ... tu array ... */ ];
+    const deliveries = [
+      /* ... tu array ... */
+    ];
+    const trucks = [
+      /* ... tu array ... */
+    ];
 
     // 2. Act (Ejecutar)
     const result = planRoutes(warehouse, deliveries, trucks);
@@ -48,7 +51,6 @@ describe('Greedy Route Planner (VRP)', () => {
   });
 
   it('debería rechazar paquetes si el camión no tiene suficiente volumen', () => {
-     // ... armas el test del caso 3
+    // ... armas el test del caso 3
   });
-
 });

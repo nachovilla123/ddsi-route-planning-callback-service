@@ -1,56 +1,247 @@
-import { planRoutes } from './greedy-route-planner';
+import { planRoutes, Warehouse, Delivery, Truck } from './greedy-route-planner';
 
-// 1. El "Happy Path" (Ruta Feliz)
+const warehouse: Warehouse = {
+  lat: -34.6037,
+  lon: -58.3816,
+  address: 'Obelisco, Buenos Aires',
+};
 
-// Qué probar: Exactamente el payload que acabamos de usar.
+function makeTruck(overrides: Partial<Truck> & { truckId: string }): Truck {
+  return {
+    weightCapacityKg: 1000,
+    volumeCapacityM3: 10,
+    ...overrides,
+  };
+}
 
-// Qué esperar: Que asigne todo correctamente, que unassignedDeliveries esté vacío, y que el orden de las paradas (stops) sea el correcto.
+function makeDelivery(
+  overrides: Partial<Delivery> & { deliveryCode: string },
+): Delivery {
+  return {
+    lat: warehouse.lat,
+    lon: warehouse.lon,
+    weightKg: 10,
+    volumeM3: 1,
+    ...overrides,
+  };
+}
 
-// 2. El escenario "Falta de Flota" (Capacidad Excedida)
+describe('Greedy Route Planner', () => {
+  // ── 1. Happy Path ──────────────────────────────────────────────
 
-// Qué probar: Mandar 5 entregas de 100kg cada una, pero enviar un solo camión que soporta 50kg.
-
-// Qué esperar: El arreglo routes vuelve vacío, y todos los paquetes terminan en el arreglo unassignedDeliveries con el reason correspondiente.
-
-// 3. La trampa del "Volumen vs. Peso" (Restricciones Cruzadas)
-
-// Qué probar: Un paquete pesa solo 1kg (entra perfecto por peso) pero ocupa 10m3 (es una caja gigante llena de plumas). El camión soporta 1000kg, pero solo tiene 5m3 de espacio.
-
-// Qué esperar: El algoritmo debe rechazar el paquete y mandarlo a unassignedDeliveries. (Esto prueba que tu && en el condicional de capacidad funciona perfecto).
-
-// 4. El test de "Pura Cercanía" (El corazón del algoritmo)
-
-// Qué probar: Un camión gigante (capacidad infinita), el depósito en el centro, el Paquete A a 5km y el Paquete B a 1km.
-
-// Qué esperar: Asegurar estrictamente que la parada 1 (stopNumber: 1) sea el Paquete B, y la parada 2 sea el Paquete A. (Esto valida que tu ciclo de minDistance y la fórmula de Haversine están calculando bien).
-
-// 5. Los "Edge Cases" (Casos Extremos)
-
-// Cero Camiones: Le mandas entregas, pero la lista de camiones está vacía []. Todo debe ir a unassigned.
-
-// Cero Entregas: Le mandas camiones, pero ninguna entrega. Debe devolver todo vacío sin crashear.
-
-describe('Greedy Route Planner (VRP)', () => {
-  it('debería asignar todas las rutas correctamente en el Happy Path', () => {
-    // 1. Arrange (Preparar datos)
-    const warehouse = { lat: -34.6037, lon: -58.3816, address: 'Centro' };
-    const deliveries = [
-      /* ... tu array ... */
+  it('asigna todas las entregas cuando hay capacidad suficiente', () => {
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'D1', lat: -34.61, lon: -58.38 }),
+      makeDelivery({ deliveryCode: 'D2', lat: -34.62, lon: -58.39 }),
     ];
-    const trucks = [
-      /* ... tu array ... */
+    const trucks: Truck[] = [
+      makeTruck({ truckId: 'T1', weightCapacityKg: 500, volumeCapacityM3: 50 }),
     ];
 
-    // 2. Act (Ejecutar)
     const result = planRoutes(warehouse, deliveries, trucks);
 
-    // 3. Assert (Validar)
-    expect(result.unassignedDeliveries.length).toBe(0);
-    expect(result.routes.length).toBe(2);
-    expect(result.routes[0].truckId).toBe('CAMION-CHICO');
+    expect(result.unassignedDeliveries).toHaveLength(0);
+    expect(result.routes).toHaveLength(1);
+    expect(result.routes[0].truckId).toBe('T1');
+    expect(result.routes[0].stops).toHaveLength(2);
+    expect(result.routes[0].assignedRouteId).toMatch(/^route_/);
   });
 
-  it('debería rechazar paquetes si el camión no tiene suficiente volumen', () => {
-    // ... armas el test del caso 3
+  // ── 2. Falta de Flota ─────────────────────────────────────────
+
+  it('marca todas las entregas como no asignadas si el camión no alcanza', () => {
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'D1', weightKg: 100 }),
+      makeDelivery({ deliveryCode: 'D2', weightKg: 100 }),
+      makeDelivery({ deliveryCode: 'D3', weightKg: 100 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({ truckId: 'T1', weightCapacityKg: 50, volumeCapacityM3: 50 }),
+    ];
+
+    const result = planRoutes(warehouse, deliveries, trucks);
+
+    expect(result.routes).toHaveLength(0);
+    expect(result.unassignedDeliveries).toHaveLength(3);
+    result.unassignedDeliveries.forEach((u) => {
+      expect(u.reason).toBeDefined();
+    });
+  });
+
+  // ── 3. Volumen vs. Peso (restricciones cruzadas) ──────────────
+
+  it('rechaza un paquete que entra por peso pero no por volumen', () => {
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'PLUMAS', weightKg: 1, volumeM3: 10 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({ truckId: 'T1', weightCapacityKg: 1000, volumeCapacityM3: 5 }),
+    ];
+
+    const result = planRoutes(warehouse, deliveries, trucks);
+
+    expect(result.routes).toHaveLength(0);
+    expect(result.unassignedDeliveries).toHaveLength(1);
+    expect(result.unassignedDeliveries[0].deliveryCode).toBe('PLUMAS');
+  });
+
+  it('rechaza un paquete que entra por volumen pero no por peso', () => {
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'PLOMO', weightKg: 500, volumeM3: 0.1 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({ truckId: 'T1', weightCapacityKg: 100, volumeCapacityM3: 50 }),
+    ];
+
+    const result = planRoutes(warehouse, deliveries, trucks);
+
+    expect(result.routes).toHaveLength(0);
+    expect(result.unassignedDeliveries).toHaveLength(1);
+    expect(result.unassignedDeliveries[0].deliveryCode).toBe('PLOMO');
+  });
+
+  // ── 4. Cercanía (el corazón del algoritmo greedy) ─────────────
+
+  it('asigna primero la entrega más cercana al depósito', () => {
+    // Paquete A: lejos (~11 km al sur)
+    // Paquete B: cerca (~1 km al sur)
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'LEJOS', lat: -34.7, lon: -58.38 }),
+      makeDelivery({ deliveryCode: 'CERCA', lat: -34.61, lon: -58.38 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({
+        truckId: 'T1',
+        weightCapacityKg: 10000,
+        volumeCapacityM3: 100,
+      }),
+    ];
+
+    const result = planRoutes(warehouse, deliveries, trucks);
+
+    expect(result.routes).toHaveLength(1);
+    const stops = result.routes[0].stops;
+    expect(stops[0].deliveryCode).toBe('CERCA');
+    expect(stops[0].stopNumber).toBe(1);
+    expect(stops[1].deliveryCode).toBe('LEJOS');
+    expect(stops[1].stopNumber).toBe(2);
+  });
+
+  it('encadena la cercanía desde la última parada, no desde el depósito', () => {
+    // Depot en (0, 0). A en (0, 1), B en (0, 2), C en (0, 10).
+    // Greedy: depot->A(1)  ->B(1 from A)  ->C(8 from B)
+    const depot: Warehouse = { lat: 0, lon: 0, address: 'Origin' };
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'C', lat: 0, lon: 10 }),
+      makeDelivery({ deliveryCode: 'A', lat: 0, lon: 1 }),
+      makeDelivery({ deliveryCode: 'B', lat: 0, lon: 2 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({
+        truckId: 'T1',
+        weightCapacityKg: 10000,
+        volumeCapacityM3: 100,
+      }),
+    ];
+
+    const result = planRoutes(depot, deliveries, trucks);
+
+    const codes = result.routes[0].stops.map((s) => s.deliveryCode);
+    expect(codes).toEqual(['A', 'B', 'C']);
+  });
+
+  // ── 5. Edge Cases ─────────────────────────────────────────────
+
+  it('devuelve todo vacío cuando no hay camiones', () => {
+    const deliveries: Delivery[] = [makeDelivery({ deliveryCode: 'D1' })];
+
+    const result = planRoutes(warehouse, deliveries, []);
+
+    expect(result.routes).toHaveLength(0);
+    expect(result.unassignedDeliveries).toHaveLength(1);
+  });
+
+  it('devuelve todo vacío cuando no hay entregas', () => {
+    const trucks: Truck[] = [makeTruck({ truckId: 'T1' })];
+
+    const result = planRoutes(warehouse, [], trucks);
+
+    expect(result.routes).toHaveLength(0);
+    expect(result.unassignedDeliveries).toHaveLength(0);
+  });
+
+  it('devuelve vacío si no hay camiones ni entregas', () => {
+    const result = planRoutes(warehouse, [], []);
+
+    expect(result.routes).toHaveLength(0);
+    expect(result.unassignedDeliveries).toHaveLength(0);
+  });
+
+  // ── 6. Múltiples camiones ─────────────────────────────────────
+
+  it('reparte entregas entre varios camiones cuando uno se llena', () => {
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'D1', weightKg: 80 }),
+      makeDelivery({ deliveryCode: 'D2', weightKg: 80 }),
+      makeDelivery({ deliveryCode: 'D3', weightKg: 80 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({
+        truckId: 'T1',
+        weightCapacityKg: 100,
+        volumeCapacityM3: 100,
+      }),
+      makeTruck({
+        truckId: 'T2',
+        weightCapacityKg: 200,
+        volumeCapacityM3: 100,
+      }),
+    ];
+
+    const result = planRoutes(warehouse, deliveries, trucks);
+
+    expect(result.unassignedDeliveries).toHaveLength(0);
+    expect(result.routes).toHaveLength(2);
+
+    const allStops = result.routes.flatMap((r) => r.stops);
+    expect(allStops).toHaveLength(3);
+  });
+
+  it('genera un assignedRouteId único por ruta', () => {
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'D1', weightKg: 50 }),
+      makeDelivery({ deliveryCode: 'D2', weightKg: 50 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({ truckId: 'T1', weightCapacityKg: 60, volumeCapacityM3: 100 }),
+      makeTruck({ truckId: 'T2', weightCapacityKg: 60, volumeCapacityM3: 100 }),
+    ];
+
+    const result = planRoutes(warehouse, deliveries, trucks);
+
+    const routeIds = result.routes.map((r) => r.assignedRouteId);
+    expect(new Set(routeIds).size).toBe(routeIds.length);
+  });
+
+  // ── 7. Capacidad se consume correctamente ─────────────────────
+
+  it('no asigna más entregas cuando la capacidad restante no alcanza', () => {
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'D1', weightKg: 60 }),
+      makeDelivery({ deliveryCode: 'D2', weightKg: 60 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({
+        truckId: 'T1',
+        weightCapacityKg: 100,
+        volumeCapacityM3: 100,
+      }),
+    ];
+
+    const result = planRoutes(warehouse, deliveries, trucks);
+
+    expect(result.routes).toHaveLength(1);
+    expect(result.routes[0].stops).toHaveLength(1);
+    expect(result.unassignedDeliveries).toHaveLength(1);
   });
 });

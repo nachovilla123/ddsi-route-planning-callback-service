@@ -1,10 +1,4 @@
-import {
-  planRoutes,
-  Warehouse,
-  Delivery,
-  Truck,
-  TimeWindow,
-} from './greedy-route-planner';
+import { planRoutes, Warehouse, Delivery, Truck } from './greedy-route-planner';
 
 const warehouse: Warehouse = {
   lat: -34.6037,
@@ -12,14 +6,12 @@ const warehouse: Warehouse = {
   address: 'Obelisco, Buenos Aires',
 };
 
-// Mock de Jornada: 8 horas operativas
-const timeWindow: TimeWindow = {
-  start: '2025-09-21T09:00:00Z',
-  end: '2025-09-21T17:00:00Z',
-};
-
 function makeTruck(overrides: Partial<Truck> & { truckId: string }): Truck {
-  return { weightCapacityKg: 1000, volumeCapacityM3: 10, ...overrides };
+  return {
+    weightCapacityKg: 1000,
+    volumeCapacityM3: 10,
+    ...overrides,
+  };
 }
 
 function makeDelivery(
@@ -46,13 +38,13 @@ describe('Greedy Route Planner', () => {
       makeTruck({ truckId: 'T1', weightCapacityKg: 500, volumeCapacityM3: 50 }),
     ];
 
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
+    const result = planRoutes(warehouse, deliveries, trucks);
 
     expect(result.unassignedDeliveries).toHaveLength(0);
     expect(result.routes).toHaveLength(1);
     expect(result.routes[0].truckId).toBe('T1');
     expect(result.routes[0].stops).toHaveLength(2);
-    expect(result.routes[0].assignedRouteId).toMatch(/^ROUTE-/);
+    expect(result.routes[0].assignedRouteId).toMatch(/^route_/);
   });
 
   // ── 2. Falta de Flota ─────────────────────────────────────────
@@ -67,7 +59,7 @@ describe('Greedy Route Planner', () => {
       makeTruck({ truckId: 'T1', weightCapacityKg: 50, volumeCapacityM3: 50 }),
     ];
 
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
+    const result = planRoutes(warehouse, deliveries, trucks);
 
     expect(result.routes).toHaveLength(0);
     expect(result.unassignedDeliveries).toHaveLength(3);
@@ -86,7 +78,7 @@ describe('Greedy Route Planner', () => {
       makeTruck({ truckId: 'T1', weightCapacityKg: 1000, volumeCapacityM3: 5 }),
     ];
 
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
+    const result = planRoutes(warehouse, deliveries, trucks);
 
     expect(result.routes).toHaveLength(0);
     expect(result.unassignedDeliveries).toHaveLength(1);
@@ -101,7 +93,7 @@ describe('Greedy Route Planner', () => {
       makeTruck({ truckId: 'T1', weightCapacityKg: 100, volumeCapacityM3: 50 }),
     ];
 
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
+    const result = planRoutes(warehouse, deliveries, trucks);
 
     expect(result.routes).toHaveLength(0);
     expect(result.unassignedDeliveries).toHaveLength(1);
@@ -111,6 +103,8 @@ describe('Greedy Route Planner', () => {
   // ── 4. Cercanía (el corazón del algoritmo greedy) ─────────────
 
   it('asigna primero la entrega más cercana al depósito', () => {
+    // Paquete A: lejos (~11 km al sur)
+    // Paquete B: cerca (~1 km al sur)
     const deliveries: Delivery[] = [
       makeDelivery({ deliveryCode: 'LEJOS', lat: -34.7, lon: -58.38 }),
       makeDelivery({ deliveryCode: 'CERCA', lat: -34.61, lon: -58.38 }),
@@ -123,7 +117,7 @@ describe('Greedy Route Planner', () => {
       }),
     ];
 
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
+    const result = planRoutes(warehouse, deliveries, trucks);
 
     expect(result.routes).toHaveLength(1);
     const stops = result.routes[0].stops;
@@ -133,12 +127,35 @@ describe('Greedy Route Planner', () => {
     expect(stops[1].stopNumber).toBe(2);
   });
 
+  it('encadena la cercanía desde la última parada, no desde el depósito', () => {
+    // Depot en (0, 0). A en (0, 1), B en (0, 2), C en (0, 10).
+    // Greedy: depot->A(1)  ->B(1 from A)  ->C(8 from B)
+    const depot: Warehouse = { lat: 0, lon: 0, address: 'Origin' };
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'C', lat: 0, lon: 10 }),
+      makeDelivery({ deliveryCode: 'A', lat: 0, lon: 1 }),
+      makeDelivery({ deliveryCode: 'B', lat: 0, lon: 2 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({
+        truckId: 'T1',
+        weightCapacityKg: 10000,
+        volumeCapacityM3: 100,
+      }),
+    ];
+
+    const result = planRoutes(depot, deliveries, trucks);
+
+    const codes = result.routes[0].stops.map((s) => s.deliveryCode);
+    expect(codes).toEqual(['A', 'B', 'C']);
+  });
+
   // ── 5. Edge Cases ─────────────────────────────────────────────
 
   it('devuelve todo vacío cuando no hay camiones', () => {
     const deliveries: Delivery[] = [makeDelivery({ deliveryCode: 'D1' })];
 
-    const result = planRoutes(timeWindow, warehouse, deliveries, []);
+    const result = planRoutes(warehouse, deliveries, []);
 
     expect(result.routes).toHaveLength(0);
     expect(result.unassignedDeliveries).toHaveLength(1);
@@ -147,7 +164,14 @@ describe('Greedy Route Planner', () => {
   it('devuelve todo vacío cuando no hay entregas', () => {
     const trucks: Truck[] = [makeTruck({ truckId: 'T1' })];
 
-    const result = planRoutes(timeWindow, warehouse, [], trucks);
+    const result = planRoutes(warehouse, [], trucks);
+
+    expect(result.routes).toHaveLength(0);
+    expect(result.unassignedDeliveries).toHaveLength(0);
+  });
+
+  it('devuelve vacío si no hay camiones ni entregas', () => {
+    const result = planRoutes(warehouse, [], []);
 
     expect(result.routes).toHaveLength(0);
     expect(result.unassignedDeliveries).toHaveLength(0);
@@ -174,77 +198,50 @@ describe('Greedy Route Planner', () => {
       }),
     ];
 
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
+    const result = planRoutes(warehouse, deliveries, trucks);
 
     expect(result.unassignedDeliveries).toHaveLength(0);
     expect(result.routes).toHaveLength(2);
+
+    const allStops = result.routes.flatMap((r) => r.stops);
+    expect(allStops).toHaveLength(3);
   });
 
-  // ── 7. NUEVO: Restricciones de Tiempo (VRPTW) ─────────────────
-
-  it('rechaza entregas si no alcanzan a completarse dentro de la ventana horaria', () => {
-    // Paquete extremadamente lejos (ej. otra provincia)
+  it('genera un assignedRouteId único por ruta', () => {
     const deliveries: Delivery[] = [
-      makeDelivery({ deliveryCode: 'MUY-LEJOS', lat: -38.0, lon: -58.38 }),
+      makeDelivery({ deliveryCode: 'D1', weightKg: 50 }),
+      makeDelivery({ deliveryCode: 'D2', weightKg: 50 }),
+    ];
+    const trucks: Truck[] = [
+      makeTruck({ truckId: 'T1', weightCapacityKg: 60, volumeCapacityM3: 100 }),
+      makeTruck({ truckId: 'T2', weightCapacityKg: 60, volumeCapacityM3: 100 }),
+    ];
+
+    const result = planRoutes(warehouse, deliveries, trucks);
+
+    const routeIds = result.routes.map((r) => r.assignedRouteId);
+    expect(new Set(routeIds).size).toBe(routeIds.length);
+  });
+
+  // ── 7. Capacidad se consume correctamente ─────────────────────
+
+  it('no asigna más entregas cuando la capacidad restante no alcanza', () => {
+    const deliveries: Delivery[] = [
+      makeDelivery({ deliveryCode: 'D1', weightKg: 60 }),
+      makeDelivery({ deliveryCode: 'D2', weightKg: 60 }),
     ];
     const trucks: Truck[] = [
       makeTruck({
         truckId: 'T1',
-        weightCapacityKg: 5000,
-        volumeCapacityM3: 50,
+        weightCapacityKg: 100,
+        volumeCapacityM3: 100,
       }),
     ];
 
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
+    const result = planRoutes(warehouse, deliveries, trucks);
 
-    // El camión tiene capacidad de peso/volumen, pero NO tiene tiempo en sus 8 horas.
-    expect(result.routes).toHaveLength(0);
+    expect(result.routes).toHaveLength(1);
+    expect(result.routes[0].stops).toHaveLength(1);
     expect(result.unassignedDeliveries).toHaveLength(1);
-    expect(result.unassignedDeliveries[0].deliveryCode).toBe('MUY-LEJOS');
-  });
-
-  it('calcula correctamente los tiempos de llegada y descarga (15 mins base)', () => {
-    const deliveries: Delivery[] = [
-      // Mismo punto exacto (distancia 0), solo tarda los 15 min de descarga
-      makeDelivery({
-        deliveryCode: 'AQUI-MISMO',
-        lat: -34.6037,
-        lon: -58.3816,
-      }),
-    ];
-    const trucks: Truck[] = [makeTruck({ truckId: 'T1' })];
-
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
-
-    const route = result.routes[0];
-    expect(route.totalDistanceKm).toBe(0);
-    expect(route.totalDurationMins).toBe(15);
-    expect(route.estimatedStartTime).toBe('2025-09-21T09:00:00.000Z');
-
-    // Debería terminar a las 09:15 AM
-    expect(route.estimatedEndTime).toBe('2025-09-21T09:15:00.000Z');
-    expect(route.stops[0].estimatedArrivalTime).toBe(
-      '2025-09-21T09:00:00.000Z',
-    );
-  });
-
-  it('acumula el tiempo de viaje correctamente para múltiples paradas', () => {
-    // Para no depender del math exacto de haversine, comprobamos que el fin es mayor al inicio
-    const deliveries: Delivery[] = [
-      makeDelivery({ deliveryCode: 'P1', lat: -34.61, lon: -58.38 }),
-      makeDelivery({ deliveryCode: 'P2', lat: -34.62, lon: -58.39 }),
-    ];
-    const trucks: Truck[] = [makeTruck({ truckId: 'T1' })];
-
-    const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
-
-    const route = result.routes[0];
-    const startTimestamp = new Date(route.estimatedStartTime).getTime();
-    const endTimestamp = new Date(route.estimatedEndTime).getTime();
-
-    // Al haber distancia y dos paradas, el tiempo total debe ser mayor a 30 mins (2 * 15m dropoff)
-    expect(endTimestamp - startTimestamp).toBeGreaterThan(30 * 60000);
-    expect(route.totalDurationMins).toBeGreaterThan(30);
-    expect(route.totalDistanceKm).toBeGreaterThan(0);
   });
 });

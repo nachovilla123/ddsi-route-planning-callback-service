@@ -10,6 +10,7 @@ import { WebhookStatus } from '../../dispatch/entities/webhook-status.enum';
 import { RoutingRequest } from '../../ingestion/entities/routing-request.entity';
 import { WebhookOutbox } from '../../dispatch/entities/webhook-outbox.entity';
 import { PlanningResult } from '../utils/greedy-route-planner';
+import { envConfig } from 'src/config/env.config';
 
 import type { RoutingPayload } from '../../ingestion/entities/routing-payload';
 
@@ -39,117 +40,117 @@ export class PlanningService {
     await runner.connect();
     await runner.startTransaction();
 
-    let processingRequest: RawRoutingRequest | null = null;
-
+    let processingRequests: RawRoutingRequest[] = [];
     try {
-      const rows = (await runner.query(
+      processingRequests = (await runner.query(
         `SELECT * FROM routing_requests
          WHERE status = $1
          ORDER BY created_at ASC
-         LIMIT 1
+         LIMIT $2
          FOR UPDATE SKIP LOCKED`,
-        [RoutingStatus.PENDING],
+        [RoutingStatus.PENDING, envConfig.planning.planningBatchSize],
       )) as RawRoutingRequest[];
 
-      if (!rows.length) {
+      if (!processingRequests.length) {
         await runner.rollbackTransaction();
         return;
       }
 
-      processingRequest = rows[0];
-
-      await runner.manager.update(RoutingRequest, processingRequest.id, {
-        status: RoutingStatus.PROCESSING,
-      });
+      const requestIds = processingRequests.map((r) => r.id);
+      await runner.query(
+        `UPDATE routing_requests SET status = $1 WHERE id = ANY($2)`,
+        [RoutingStatus.PROCESSING, requestIds],
+      );
 
       await runner.commitTransaction();
     } catch (err) {
       await runner.rollbackTransaction();
-      this.logger.error('Error Setting transaction as PROCESSING', err);
+      this.logger.error('Error extrayendo el lote de routing_requests', err);
       return;
     } finally {
       await runner.release();
     }
 
-    if (!processingRequest) return;
+    const planningPromises = processingRequests.map(async (request) => {
+      let routePlanningResult: PlanningResult | null = null;
 
-    let routePlanningResult: PlanningResult | null = null;
-    try {
-      const payload = processingRequest.payload;
+      try {
+        const payload = request.payload;
 
-      routePlanningResult = await this.vrpWorker.run(
-        payload.timeWindow,
-        {
-          lat: payload.warehouse.latitude,
-          lon: payload.warehouse.longitude,
-          address: payload.warehouse.address,
-        },
-        payload.deliveries.map((d) => ({
-          deliveryCode: d.deliveryCode,
-          lat: d.latitude,
-          lon: d.longitude,
-          weightKg: d.WeightKg,
-          volumeM3: d.VolumeM3,
-        })),
-        payload.trucks.map((t) => ({
-          truckId: t.truckId,
-          weightCapacityKg: t.WeightCapacityKg,
-          volumeCapacityM3: t.VolumeCapacityM3,
-        })),
-      );
-    } catch (workerErr) {
-      this.logger.error(
-        `Error in Worker VRP for request ${processingRequest.id}`,
-        workerErr,
-      );
+        routePlanningResult = await this.vrpWorker.run(
+          payload.timeWindow,
+          {
+            lat: payload.warehouse.latitude,
+            lon: payload.warehouse.longitude,
+            address: payload.warehouse.address,
+          },
+          payload.deliveries.map((d) => ({
+            deliveryCode: d.deliveryCode,
+            lat: d.latitude,
+            lon: d.longitude,
+            weightKg: d.WeightKg,
+            volumeM3: d.VolumeM3,
+          })),
+          payload.trucks.map((t) => ({
+            truckId: t.truckId,
+            weightCapacityKg: t.WeightCapacityKg,
+            volumeCapacityM3: t.VolumeCapacityM3,
+          })),
+        );
+      } catch (workerErr) {
+        this.logger.error(
+          `Error en el Worker VRP para el request ${request.id}`,
+          workerErr,
+        );
+        await this.requestsRepo.update(request.id, {
+          status: RoutingStatus.FAILED,
+        });
+        return;
+      }
 
-      await this.requestsRepo.update(processingRequest.id, {
-        status: RoutingStatus.FAILED,
-      });
-      return;
-    }
+      const saveRunner = this.dataSource.createQueryRunner();
+      await saveRunner.connect();
+      await saveRunner.startTransaction();
 
-    const runner2 = this.dataSource.createQueryRunner();
-    await runner2.connect();
-    await runner2.startTransaction();
+      try {
+        await saveRunner.manager.update(RoutingRequest, request.id, {
+          status: RoutingStatus.COMPLETED,
+        });
 
-    try {
-      await runner2.manager.update(RoutingRequest, processingRequest.id, {
-        status: RoutingStatus.COMPLETED,
-      });
+        const outboxPayload = {
+          event_id: `evt_${randomUUID()}`,
+          event_type: 'routing.completed',
+          request_id: request.id,
+          timestamp: new Date().toISOString(),
+          data: routePlanningResult,
+        };
 
-      const outboxPayload = {
-        event_id: `evt_${randomUUID()}`,
-        event_type: 'routing.completed',
-        request_id: processingRequest.id,
-        timestamp: new Date().toISOString(),
-        data: routePlanningResult,
-      };
+        const newOutboxEntry = saveRunner.manager.create(WebhookOutbox, {
+          id: randomUUID(),
+          requestId: request.id,
+          groupId: request.group_id,
+          payload: outboxPayload,
+          status: WebhookStatus.PENDING,
+          retryCount: 0,
+          nextAttemptAt: new Date(),
+        });
+        await saveRunner.manager.save(newOutboxEntry);
 
-      const newOutboxEntry = runner2.manager.create(WebhookOutbox, {
-        id: randomUUID(),
-        requestId: processingRequest.id,
-        groupId: processingRequest.group_id,
-        payload: outboxPayload,
-        status: WebhookStatus.PENDING,
-        retryCount: 0,
-        nextAttemptAt: new Date(),
-      });
-      await runner2.manager.save(newOutboxEntry);
+        await saveRunner.commitTransaction();
+      } catch (err: unknown) {
+        await saveRunner.rollbackTransaction();
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(
+          `No se pudo guardar el webhook para request ${request.id}. ${message}`,
+        );
+        await this.requestsRepo.update(request.id, {
+          status: RoutingStatus.FAILED,
+        });
+      } finally {
+        await saveRunner.release();
+      }
+    });
 
-      await runner2.commitTransaction();
-    } catch (err: unknown) {
-      await runner2.rollbackTransaction();
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `Could not save webhook for request ${processingRequest.id}. ${message}`,
-      );
-
-      await this.requestsRepo.update(processingRequest.id, {
-        status: RoutingStatus.FAILED,
-      });
-    } finally {
-      await runner2.release();
-    }
+    await Promise.allSettled(planningPromises);
   }
 }

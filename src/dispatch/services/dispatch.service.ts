@@ -1,14 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { DataSource, QueryRunner, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { WebhookOutbox } from '../entities/webhook-outbox.entity';
 import { StudentGroup } from '../../groups/entities/student-group.entity';
 import { sign } from '../utils/hmac-signer';
 import { nextAttemptAt } from '../utils/backoff';
 import { WebhookStatus } from '../entities/webhook-status.enum';
 import { InjectRepository } from '@nestjs/typeorm';
-
-const MAX_RETRIES = 5;
+import { envConfig } from 'src/config/env.config';
 
 interface RawOutbox {
   id: string;
@@ -32,27 +31,26 @@ export class DispatchService {
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async dispatchNext(): Promise<void> {
-    const runner: QueryRunner = this.dataSource.createQueryRunner();
+    const runner = this.dataSource.createQueryRunner();
     await runner.connect();
     await runner.startTransaction();
 
-    let outbox: RawOutbox | null = null;
+    let outboxes: RawOutbox[] = [];
 
     try {
-      const rows = (await runner.query(
+      outboxes = (await runner.query(
         `SELECT * FROM webhook_outbox
          WHERE status = 'PENDING' AND next_attempt_at <= NOW()
          ORDER BY next_attempt_at ASC
-         LIMIT 1
+         LIMIT $1
          FOR UPDATE SKIP LOCKED`,
+        [envConfig.webhook.dispatchBatchSize],
       )) as unknown as RawOutbox[];
 
-      if (!rows.length) {
+      if (!outboxes.length) {
         await runner.rollbackTransaction();
         return;
       }
-
-      outbox = rows[0];
 
       await runner.commitTransaction();
     } catch (err) {
@@ -63,58 +61,63 @@ export class DispatchService {
       await runner.release();
     }
 
-    if (!outbox) return;
-
-    try {
-      const group = await this.groupRepo.findOneBy({ id: outbox.group_id });
-
-      if (!group) {
-        this.logger.warn(`No group found for id ${outbox.group_id}`);
-        await this.dataSource.query(
-          `UPDATE webhook_outbox SET status = $1 WHERE id = $2`,
-          [WebhookStatus.FAILED, outbox.id],
-        );
-        return;
-      }
-
-      const body = JSON.stringify(outbox.payload);
-      const signature = sign(body, group.clientSecret);
-
-      let delivered = false;
+    const dispatchPromises = outboxes.map(async (outbox) => {
       try {
-        const response = await fetch(group.callbackUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Signature': signature,
-          },
-          body,
-        });
-        delivered = response.ok;
-      } catch {
-        delivered = false; // El servidor del alumno está apagado o no resuelve el DNS
-      }
+        const group = await this.groupRepo.findOneBy({ id: outbox.group_id });
 
-      if (delivered) {
-        await this.outboxRepo.update(outbox.id, {
-          status: WebhookStatus.DELIVERED,
-        });
-      } else {
-        const newRetryCount = outbox.retry_count + 1;
-        if (newRetryCount >= MAX_RETRIES) {
+        if (!group) {
+          this.logger.warn(`Grupo no encontrado para webhook ${outbox.id}`);
           await this.outboxRepo.update(outbox.id, {
             status: WebhookStatus.FAILED,
-            retryCount: newRetryCount,
+          });
+          return;
+        }
+
+        const body = JSON.stringify(outbox.payload);
+        const signature = sign(body, group.clientSecret);
+
+        let delivered = false;
+        try {
+          const response = await fetch(group.callbackUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Signature': signature,
+            },
+            body,
+            signal: AbortSignal.timeout(envConfig.webhook.timeoutMs),
+          });
+          delivered = response.ok;
+        } catch {
+          delivered = false;
+        }
+
+        if (delivered) {
+          await this.outboxRepo.update(outbox.id, {
+            status: WebhookStatus.DELIVERED,
           });
         } else {
-          await this.outboxRepo.update(outbox.id, {
-            retryCount: newRetryCount,
-            nextAttemptAt: nextAttemptAt(newRetryCount),
-          });
+          const newRetryCount = outbox.retry_count + 1;
+          if (newRetryCount >= envConfig.webhook.maxRetries) {
+            await this.outboxRepo.update(outbox.id, {
+              status: WebhookStatus.FAILED,
+              retryCount: newRetryCount,
+            });
+          } else {
+            await this.outboxRepo.update(outbox.id, {
+              retryCount: newRetryCount,
+              nextAttemptAt: nextAttemptAt(newRetryCount),
+            });
+          }
         }
+      } catch (err) {
+        this.logger.error(
+          `Fallo catastrófico en worker individual para ID ${outbox.id}`,
+          err,
+        );
       }
-    } catch (err) {
-      this.logger.error('Dispatch error', err);
-    }
+    });
+
+    await Promise.allSettled(dispatchPromises);
   }
 }

@@ -10,12 +10,40 @@ function requireEnv(key: string): string {
   return value;
 }
 
-function requireEnvNumber(key: string): number {
+function requireEnvNumber(key: string, minValue: number = 1): number {
   const raw = requireEnv(key);
   const num = Number(raw);
   if (isNaN(num)) {
     throw new Error(
       `Environment variable ${key} must be a number, got: "${raw}"`,
+    );
+  }
+  if (num < minValue) {
+    throw new Error(
+      `Environment variable ${key} must be at least ${minValue}, got: ${num}`,
+    );
+  }
+  return num;
+}
+
+function getEnvNumberOrDefault(
+  key: string,
+  defaultValue: number,
+  minValue: number = 1,
+): number {
+  const raw = process.env[key];
+  if (raw === undefined || raw === '') {
+    return defaultValue;
+  }
+  const num = Number(raw);
+  if (isNaN(num)) {
+    throw new Error(
+      `Environment variable ${key} must be a number, got: "${raw}"`,
+    );
+  }
+  if (num < minValue) {
+    throw new Error(
+      `Environment variable ${key} must be at least ${minValue}, got: ${num}`,
     );
   }
   return num;
@@ -30,4 +58,14 @@ export const envConfig = {
     name: requireEnv('DB_NAME'),
   },
   port: requireEnvNumber('PORT'),
+
+  webhook: {
+    maxRetries: getEnvNumberOrDefault('WEBHOOK_MAX_RETRIES', 5, 1),
+    timeoutMs: getEnvNumberOrDefault('WEBHOOK_TIMEOUT_MS', 5000, 1000),
+    dispatchBatchSize: getEnvNumberOrDefault('DISPATCH_BATCH_SIZE', 10, 1),
+  },
+
+  planning: {
+    planningBatchSize: getEnvNumberOrDefault('PLANNING_BATCH_SIZE', 5, 1),
+  },
 } as const;

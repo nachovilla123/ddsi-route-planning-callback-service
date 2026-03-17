@@ -64,6 +64,7 @@ export class PlanRouteDto {
   })
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(10)
   @ValidateNested({ each: true })
   @ArrayUnique((truck: TruckDto) => truck.truckId, {
     message: 'truckIds must be unique within the truck list',

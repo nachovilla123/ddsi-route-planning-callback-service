@@ -1,11 +1,10 @@
-import { IsNumber, IsString, IsNotEmpty } from 'class-validator';
+import { IsNumber, IsString, IsNotEmpty, IsPositive } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsLatitude,
   IsLongitude,
 } from 'src/shared/decorators/coordinates-validator';
 
-// delivery DTO = entrega DTO
 export class DeliveryDto {
   @ApiProperty({
     example: 'DEL-001',
@@ -39,13 +38,27 @@ export class DeliveryDto {
   @IsNotEmpty()
   address: string;
 
-  @ApiProperty({ example: 25.5, description: 'Peso en kg' })
+  @ApiProperty({
+    example: 25.5,
+    description: 'Peso en kg (debe ser mayor a 0)',
+    minimum: 0.01,
+  })
   @IsNumber()
+  @IsPositive({
+    message: 'El peso (WeightKg) debe ser un número positivo mayor a 0',
+  })
   @IsNotEmpty()
   WeightKg: number;
 
-  @ApiProperty({ example: 0.5, description: 'Volumen en m3' })
+  @ApiProperty({
+    example: 0.5,
+    description: 'Volumen en m3 (debe ser mayor a 0)',
+    minimum: 0.01,
+  })
   @IsNumber()
+  @IsPositive({
+    message: 'El volumen (VolumeM3) debe ser un número positivo mayor a 0',
+  })
   @IsNotEmpty()
   VolumeM3: number;
 }

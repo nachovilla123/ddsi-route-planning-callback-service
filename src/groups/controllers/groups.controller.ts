@@ -29,6 +29,7 @@ export class GroupsController {
 
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 3600000 } })
+  //ttl = 3600000 ms = 1 hora, limit = 5 registros por hora para evitar abusos
   @HttpCode(201)
   @ApiOperation({ summary: 'Registrar un nuevo grupo' })
   @ApiResponse({

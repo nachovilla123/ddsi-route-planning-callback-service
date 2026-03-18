@@ -1,9 +1,4 @@
-import {
-  Column,
-  CreateDateColumn,
-  Entity,
-  PrimaryColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, PrimaryColumn } from 'typeorm';
 import { WebhookStatus } from './webhook-status.enum';
 
 //? DOCS: webhookOutBox nos permite almacenar los webhooks que tenemos que enviar a los clientes,
@@ -27,7 +22,7 @@ export class WebhookOutbox {
   @Column({ type: 'jsonb' })
   payload: Record<string, unknown>;
 
- @Column({
+  @Column({
     type: 'enum',
     enum: WebhookStatus,
     default: WebhookStatus.PENDING,

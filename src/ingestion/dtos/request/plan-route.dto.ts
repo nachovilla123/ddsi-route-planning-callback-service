@@ -5,12 +5,15 @@ import {
   IsUUID,
   ValidateNested,
   ArrayUnique,
+  IsDefined,
+  IsNotEmptyObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { DeliveryDto } from './delivery.dto';
 import { TruckDto } from './truck.dto';
 import { WarehouseDto } from './warehouse.dto';
+import { TimeWindowDto } from './time-window.dto';
 
 export class PlanRouteDto {
   @ApiProperty({
@@ -19,6 +22,16 @@ export class PlanRouteDto {
   })
   @IsUUID()
   requestId: string;
+
+  @ApiProperty({
+    description: 'Jornada operativa (ventana horaria)',
+    type: TimeWindowDto,
+  })
+  @ValidateNested()
+  @IsDefined({ message: 'El objeto timeWindow es obligatorio' })
+  @IsNotEmptyObject({}, { message: 'El timeWindow no puede estar vacío' })
+  @Type(() => TimeWindowDto)
+  timeWindow: TimeWindowDto;
 
   @ApiProperty({
     description: 'Datos del deposito de origen',
@@ -45,12 +58,14 @@ export class PlanRouteDto {
   deliveries: DeliveryDto[];
 
   @ApiProperty({
-    description: 'Lista de camiones disponibles',
+    description: 'Lista de camiones disponibles (1-10)',
     type: [TruckDto],
     minItems: 1,
+    maxItems: 10,
   })
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(10)
   @ValidateNested({ each: true })
   @ArrayUnique((truck: TruckDto) => truck.truckId, {
     message: 'truckIds must be unique within the truck list',

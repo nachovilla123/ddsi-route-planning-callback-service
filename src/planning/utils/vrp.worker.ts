@@ -2,11 +2,12 @@
 import { workerData, parentPort } from 'worker_threads';
 import { planRoutes } from './greedy-route-planner';
 
-const { warehouse, deliveries, trucks } = workerData as {
-  warehouse: Parameters<typeof planRoutes>[0];
-  deliveries: Parameters<typeof planRoutes>[1];
-  trucks: Parameters<typeof planRoutes>[2];
+const { timeWindow, warehouse, deliveries, trucks } = workerData as {
+  timeWindow: Parameters<typeof planRoutes>[0];
+  warehouse: Parameters<typeof planRoutes>[1];
+  deliveries: Parameters<typeof planRoutes>[2];
+  trucks: Parameters<typeof planRoutes>[3];
 };
 
-const result = planRoutes(warehouse, deliveries, trucks);
+const result = planRoutes(timeWindow, warehouse, deliveries, trucks);
 parentPort?.postMessage(result);

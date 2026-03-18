@@ -7,10 +7,12 @@ import {
   Truck,
   Warehouse,
 } from '../utils/greedy-route-planner';
+import { TimeWindowInfo } from 'src/ingestion/entities/routing-payload';
 
 @Injectable()
 export class VrpWorkerService implements OnModuleDestroy {
   async run(
+    timeWindow: TimeWindowInfo,
     warehouse: Warehouse,
     deliveries: Delivery[],
     trucks: Truck[],
@@ -18,7 +20,7 @@ export class VrpWorkerService implements OnModuleDestroy {
     return new Promise((resolve, reject) => {
       const workerPath = path.join(__dirname, '..', 'utils', 'vrp.worker.js');
       const worker = new Worker(workerPath, {
-        workerData: { warehouse, deliveries, trucks },
+        workerData: { timeWindow, warehouse, deliveries, trucks },
       });
       worker.once('message', resolve);
       worker.once('error', reject);

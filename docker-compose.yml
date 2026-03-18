@@ -54,6 +54,12 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
       - DB_NAME=${DB_NAME}
+      - WEBHOOK_MAX_RETRIES=${WEBHOOK_MAX_RETRIES:-5}
+      - WEBHOOK_TIMEOUT_MS=${WEBHOOK_TIMEOUT_MS:-5000}
+      - DISPATCH_BATCH_SIZE=${DISPATCH_BATCH_SIZE:-10}
+      - PLANNING_BATCH_SIZE=${PLANNING_BATCH_SIZE:-5}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy

@@ -4,6 +4,8 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 
+RUN npm run lint:check
+
 RUN npm run build 
 
 FROM node:20-alpine

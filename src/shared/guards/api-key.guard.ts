@@ -34,7 +34,6 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('Invalid API key format');
     }
 
-
     const group = await this.groupsService.findByApiKey(apiKey);
 
     if (!group) {

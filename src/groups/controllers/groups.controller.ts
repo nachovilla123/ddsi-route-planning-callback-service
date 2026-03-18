@@ -20,6 +20,7 @@ import { UpdateCallbackResponseDto } from '../dtos/update-callback-response.dto'
 import { ApiKeyGuard } from '../../shared/guards/api-key.guard';
 import { CurrentGroup } from '../../shared/decorators/current-group.decorator';
 import { StudentGroup } from '../entities/student-group.entity';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Groups')
 @Controller('groups')
@@ -27,6 +28,7 @@ export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 3600000 } })
   @HttpCode(201)
   @ApiOperation({ summary: 'Registrar un nuevo grupo' })
   @ApiResponse({
@@ -40,6 +42,7 @@ export class GroupsController {
   }
 
   @Patch('callback')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(ApiKeyGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Actualizar la URL de callback del grupo' })

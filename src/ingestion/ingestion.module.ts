@@ -5,10 +5,13 @@ import { StudentGroup } from '../groups/entities/student-group.entity';
 import { IngestionService } from './services/ingestion.service';
 import { IngestionController } from './controllers/ingestion.controller';
 import { GroupsModule } from '../groups/groups.module';
+import { WebhookOutbox } from 'src/dispatch/entities/webhook-outbox.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([RoutingRequest, StudentGroup]),
-   GroupsModule],
+  imports: [
+    TypeOrmModule.forFeature([RoutingRequest, StudentGroup, WebhookOutbox]),
+    GroupsModule,
+  ],
   controllers: [IngestionController],
   providers: [IngestionService],
 })

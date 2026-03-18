@@ -14,7 +14,12 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Route Generator API')
-    .setDescription('API para la generacion de rutas de entrega')
+    .setDescription(
+      `API para la generacion de rutas de entrega 
+      
+      ### 📅 Formato de Fechas
+Todas las fechas y horas en esta API (tanto en las peticiones como en las respuestas y webhooks) utilizan el estándar **ISO-8601 en zona horaria UTC** (ejemplo: \`2026-03-18T08:00:00.000Z\`).`,
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();

@@ -58,9 +58,10 @@ export class PlanRouteDto {
   deliveries: DeliveryDto[];
 
   @ApiProperty({
-    description: 'Lista de camiones disponibles',
+    description: 'Lista de camiones disponibles (1-10)',
     type: [TruckDto],
     minItems: 1,
+    maxItems: 10,
   })
   @IsArray()
   @ArrayMinSize(1)

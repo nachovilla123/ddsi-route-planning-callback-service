@@ -5,7 +5,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class TimeWindowDto {
   @ApiProperty({
     example: '2025-09-21T09:00:00Z',
-    description: 'Inicio de la jornada',
+    description: 'Fecha y hora de inicio de la jornada (Formato ISO-8601 UTC)',
   })
   @IsDateString()
   @IsNotEmpty()
@@ -13,7 +13,7 @@ export class TimeWindowDto {
 
   @ApiProperty({
     example: '2025-09-21T18:00:00Z',
-    description: 'Fin de la jornada',
+    description: 'Fecha y hora de fin de la jornada (Formato ISO-8601 UTC)',
   })
   @IsDateString()
   @IsNotEmpty()

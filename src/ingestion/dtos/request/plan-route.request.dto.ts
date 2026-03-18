@@ -10,10 +10,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { DeliveryDto } from './delivery.dto';
-import { TruckDto } from './truck.dto';
-import { WarehouseDto } from './warehouse.dto';
-import { TimeWindowDto } from './time-window.dto';
+import { DeliveryDto } from './delivery.request.dto';
+import { TruckDto } from './truck.request.dto';
+import { WarehouseDto } from './warehouse.request.dto';
+import { TimeWindowDto } from './time-window.request.dto';
 
 export class PlanRouteDto {
   @ApiProperty({

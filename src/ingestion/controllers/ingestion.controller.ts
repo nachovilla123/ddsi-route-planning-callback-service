@@ -18,9 +18,9 @@ import {
 import { ApiKeyGuard } from '../../shared/guards/api-key.guard';
 import { CurrentGroup } from '../../shared/decorators/current-group.decorator';
 import { IngestionService } from '../services/ingestion.service';
-import { PlanRouteDto } from '../dtos/request/plan-route.dto';
-import { PlanRouteResponseDto } from '../dtos/response/plan-route-response.dto';
-import { GetRouteStatusResponseDto } from '../dtos/response/get-route-response.dto';
+import { PlanRouteDto } from '../dtos/request/plan-route.request.dto';
+import { PlanRouteResponseDto } from '../dtos/response/plan-route.response.dto';
+import { GetRouteStatusResponseDto } from '../dtos/response/get-route.response.dto';
 import { StudentGroup } from '../../groups/entities/student-group.entity';
 import { Throttle } from '@nestjs/throttler';
 

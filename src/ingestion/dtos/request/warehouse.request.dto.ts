@@ -7,12 +7,11 @@ import {
 
 // warehouse DTO = deposito DTO
 export class WarehouseDto {
-  @ApiProperty({ example: -34.6037, description: 'Latitud del deposito' })
+  @ApiProperty({ example: -34.3556, description: 'Latitud del deposito' })
   @IsLatitude()
   @IsNotEmpty()
   latitude: number;
-
-  @ApiProperty({ example: -58.3816, description: 'Longitud del deposito' })
+  @ApiProperty({ example: -58.42015, description: 'Longitud del deposito' })
   @IsLongitude()
   @IsNotEmpty()
   longitude: number;

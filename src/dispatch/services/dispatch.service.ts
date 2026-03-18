@@ -8,14 +8,7 @@ import { nextAttemptAt } from '../utils/backoff';
 import { WebhookStatus } from '../entities/webhook-status.enum';
 import { InjectRepository } from '@nestjs/typeorm';
 import { envConfig } from 'src/config/env.config';
-
-interface RawOutbox {
-  id: string;
-  group_id: string;
-  payload: any;
-  retry_count: number;
-  next_attempt_at: Date;
-}
+import { RawOutbox } from '../utils/types/raw-outbox.interface';
 
 @Injectable()
 export class DispatchService {
@@ -61,6 +54,7 @@ export class DispatchService {
       await runner.release();
     }
 
+    // aca ya tenemos los outboxes que vamos a intentar despachar. El hecho de haberlos leído con "FOR UPDATE SKIP LOCKED" nos asegura que ningún otro worker va a intentar despachar el mismo webhook.
     const dispatchPromises = outboxes.map(async (outbox) => {
       try {
         const group = await this.groupRepo.findOneBy({ id: outbox.group_id });

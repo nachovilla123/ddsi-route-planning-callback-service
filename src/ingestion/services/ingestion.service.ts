@@ -7,12 +7,12 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RoutingRequest } from '../entities/routing-request.entity';
-import { PlanRouteDto } from '../dtos/request/plan-route.dto';
-import { PlanRouteResponseDto } from '../dtos/response/plan-route-response.dto';
+import { PlanRouteDto } from '../dtos/request/plan-route.request.dto';
+import { PlanRouteResponseDto } from '../dtos/response/plan-route.response.dto';
 import { RoutingStatus } from '../entities/routing-status.enum';
 import { WebhookOutbox } from '../../dispatch/entities/webhook-outbox.entity';
-import { TimeWindowDto } from '../dtos/request/time-window.dto';
-import { GetRouteStatusResponseDto } from '../dtos/response/get-route-response.dto';
+import { TimeWindowDto } from '../dtos/request/time-window.request.dto';
+import { GetRouteStatusResponseDto } from '../dtos/response/get-route.response.dto';
 
 @Injectable()
 export class IngestionService {

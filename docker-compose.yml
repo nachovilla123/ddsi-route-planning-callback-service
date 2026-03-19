@@ -15,7 +15,6 @@ services:
       retries: 5
     networks:
       - route-network
-      - dokploy-network
 
 
   migrator:
@@ -60,6 +59,7 @@ services:
         condition: service_completed_successfully
     networks:
       - route-network
+      - dokploy-network
     deploy:
       replicas: 3
 

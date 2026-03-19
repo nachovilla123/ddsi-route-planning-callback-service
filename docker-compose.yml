@@ -1,45 +1,20 @@
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - route-network
-      - dokploy-network
-
-
   migrator:
     build:
       context: .
       dockerfile: Dockerfile
     command: ["npm", "run", "migration:run"]
     environment:
-      - DB_HOST=db
+      - DB_HOST
       - DB_PORT
       - DB_USER
       - DB_PASS
       - DB_NAME
       - PORT
-    depends_on:
-      db:
-        condition: service_healthy
     networks:
-      - route-network
+      - dokploy-network
     restart: "no"
 
-  # ----------------------------------------------------
-  # 1. API PRINCIPAL (Atiende HTTP y guarda en BD)
-  # ----------------------------------------------------
   api:
     build:
       context: .
@@ -47,8 +22,8 @@ services:
     restart: unless-stopped
     environment:
       - RUN_MODE=api
-      - DB_HOST=db
       - DB_POOL_SIZE=10
+      - DB_HOST
       - DB_PORT
       - DB_USER
       - DB_PASS
@@ -59,13 +34,10 @@ services:
       migrator:
         condition: service_completed_successfully
     networks:
-      - route-network
+      - dokploy-network
     deploy:
       replicas: 3
 
-  # ----------------------------------------------------
-  # 2. WORKER DE PLANIFICACIÓN
-  # ----------------------------------------------------
   worker-planning:
     build:
       context: .
@@ -74,26 +46,23 @@ services:
     command: ["node", "dist/main-worker-planning.js"]
     environment:
       - RUN_MODE=worker-planning
-      - DB_HOST=db
       - DB_POOL_SIZE=5
+      - PLANNING_BATCH_SIZE=${PLANNING_BATCH_SIZE:-5}
+      - DB_HOST
       - DB_PORT
       - DB_USER
       - DB_PASS
       - DB_NAME
       - PORT
       - NODE_ENV=production
-      - PLANNING_BATCH_SIZE=${PLANNING_BATCH_SIZE:-5}
     depends_on:
       migrator:
         condition: service_completed_successfully
     networks:
-      - route-network
+      - dokploy-network
     deploy:
       replicas: 2
 
-  # ----------------------------------------------------
-  # 3. WORKER DE DISPATCH
-  # ----------------------------------------------------
   worker-dispatch:
     build:
       context: .
@@ -102,30 +71,25 @@ services:
     command: ["node", "dist/main-worker-dispatch.js"]
     environment:
       - RUN_MODE=worker-dispatch
-      - DB_HOST=db
       - DB_POOL_SIZE=5
-      - DB_PORT
-      - DB_USER
-      - PORT
-      - DB_PASS
-      - DB_NAME
       - WEBHOOK_MAX_RETRIES=${WEBHOOK_MAX_RETRIES:-5}
       - WEBHOOK_TIMEOUT_MS=${WEBHOOK_TIMEOUT_MS:-5000}
       - DISPATCH_BATCH_SIZE=${DISPATCH_BATCH_SIZE:-10}
+      - DB_HOST
+      - DB_PORT
+      - DB_USER
+      - DB_PASS
+      - DB_NAME
+      - PORT
       - NODE_ENV=production
     depends_on:
       migrator:
         condition: service_completed_successfully
     networks:
-      - route-network
+      - dokploy-network
     deploy:
       replicas: 2
 
-volumes:
-  pgdata:
-
 networks:
-  route-network:
-    driver: bridge
   dokploy-network:
-    external: true  
+    external: true

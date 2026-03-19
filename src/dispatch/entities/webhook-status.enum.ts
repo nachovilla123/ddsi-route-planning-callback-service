@@ -1,5 +1,6 @@
 export enum WebhookStatus {
   PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
   DELIVERED = 'DELIVERED',
   FAILED = 'FAILED',
 }

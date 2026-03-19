@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { envConfig } from './config/env.config';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -11,6 +12,10 @@ async function bootstrap() {
   app.set('trust proxy', 1);
 
   app.setGlobalPrefix('api/v1');
+
+  app.use(json({ limit: '5mb' }));
+
+  app.use(urlencoded({ extended: true, limit: '5mb' }));
 
   const config = new DocumentBuilder()
     .setTitle('Route Generator API')

@@ -1,10 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { SharedModule } from './shared/shared.module';
 import { GroupsModule } from './groups/groups.module';
 import { IngestionModule } from './ingestion/ingestion.module';
-import { PlanningModule } from './planning/planning.module';
-import { DispatchModule } from './dispatch/dispatch.module';
 import { DatabaseModule } from './database/database.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 
@@ -21,13 +18,10 @@ import { ApiKeyThrottlerGuard } from './shared/guards/api-key-throttler.guard';
         limit: 60,
       },
     ]),
-    ScheduleModule.forRoot(),
+    DatabaseModule,
     SharedModule,
     GroupsModule,
     IngestionModule,
-    PlanningModule,
-    DispatchModule,
-    DatabaseModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -11,6 +11,10 @@ export class RegisterGroupDto {
     example: 'http://localhost:3001/webhook',
     description: 'URL a la que se enviaran las rutas planificadas',
   })
-  @IsUrl({ require_tld: false })
+  @IsNotEmpty()
+  @IsUrl(
+    { require_protocol: true, protocols: ['https'] },
+    { message: 'La URL de callback debe ser válida y utilizar HTTPS.' },
+  )
   callbackUrl: string;
 }

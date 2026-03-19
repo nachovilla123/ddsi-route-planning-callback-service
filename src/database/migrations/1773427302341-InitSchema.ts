@@ -4,7 +4,7 @@ export class InitSchema1710000000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
             CREATE TYPE routing_status AS ENUM ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED');
-            CREATE TYPE webhook_status AS ENUM ('PENDING', 'DELIVERED', 'FAILED');
+            CREATE TYPE webhook_status AS ENUM ('PENDING', 'PROCESSING', 'DELIVERED', 'FAILED');
 
             CREATE TABLE student_groups (
                 id UUID PRIMARY KEY,
@@ -34,7 +34,8 @@ export class InitSchema1710000000000 implements MigrationInterface {
                 retry_count INT NOT NULL DEFAULT 0,
                 next_attempt_at TIMESTAMPTZ NOT NULL,
                 last_attempt_at TIMESTAMPTZ,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             
             CREATE INDEX idx_routing_requests_pending ON routing_requests (status, created_at) 

@@ -1,4 +1,4 @@
-import { IsUrl } from 'class-validator';
+import { IsUrl, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateCallbackDto {
@@ -6,6 +6,10 @@ export class UpdateCallbackDto {
     example: 'http://host.docker.internal:3001/webhook',
     description: 'Nueva URL de callback',
   })
-  @IsUrl({ require_tld: false })
+  @IsNotEmpty()
+  @IsUrl(
+    { require_protocol: true, protocols: ['https'] },
+    { message: 'La URL de callback debe ser válida y utilizar HTTPS.' },
+  )
   callbackUrl: string;
 }

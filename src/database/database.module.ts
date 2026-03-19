@@ -17,7 +17,7 @@ import { envConfig } from '../config/env.config';
       entities: [StudentGroup, RoutingRequest, WebhookOutbox],
       synchronize: false,
       migrations: [__dirname + '/migrations/*{.ts,.js}'],
-      migrationsRun: true,
+      migrationsRun: false,
       extra: {
         max: envConfig.db.poolSize,
       },

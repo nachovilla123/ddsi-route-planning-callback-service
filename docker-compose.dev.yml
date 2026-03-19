@@ -1,7 +1,10 @@
 services:
   db:
     image: postgres:16-alpine
+    container_name: route_generator_db
     restart: unless-stopped
+    ports: 
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
@@ -16,12 +19,13 @@ services:
     networks:
       - route-network
 
-
   migrator:
     build:
       context: .
       dockerfile: Dockerfile
     command: ["npm", "run", "migration:run"]
+    env_file: 
+      - .env
     environment:
       - DB_HOST=db
       - DB_PORT=${DB_PORT}
@@ -33,7 +37,7 @@ services:
         condition: service_healthy
     networks:
       - route-network
-    restart: "no"
+    restart: "no"    
 
   # ----------------------------------------------------
   # 1. API PRINCIPAL (Atiende HTTP y guarda en BD)
@@ -43,22 +47,25 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file: 
+      - .env
+    ports:
+      - "${PORT:-3000}:3000"
     environment:
       - RUN_MODE=api
       - DB_HOST=db
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
       - DB_POOL_SIZE=10
-      - DB_PORT
-      - DB_USER
-      - DB_PASS
-      - DB_NAME
-      - NODE_ENV=production
     depends_on:
-      migrator:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     networks:
       - route-network
     deploy:
-      replicas: 3
+      replicas: 1
 
   # ----------------------------------------------------
   # 2. WORKER DE PLANIFICACIÓN
@@ -68,20 +75,21 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file: 
+      - .env
     command: ["node", "dist/main-worker-planning.js"]
     environment:
       - RUN_MODE=worker-planning
       - DB_HOST=db
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
       - DB_POOL_SIZE=5
-      - DB_PORT
-      - DB_USER
-      - DB_PASS
-      - DB_NAME
-      - NODE_ENV=production
       - PLANNING_BATCH_SIZE=${PLANNING_BATCH_SIZE:-5}
     depends_on:
-      migrator:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     networks:
       - route-network
     deploy:
@@ -95,22 +103,23 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file: 
+      - .env
     command: ["node", "dist/main-worker-dispatch.js"]
     environment:
       - RUN_MODE=worker-dispatch
       - DB_HOST=db
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
       - DB_POOL_SIZE=5
-      - DB_PORT
-      - DB_USER
-      - DB_PASS
-      - DB_NAME
       - WEBHOOK_MAX_RETRIES=${WEBHOOK_MAX_RETRIES:-5}
       - WEBHOOK_TIMEOUT_MS=${WEBHOOK_TIMEOUT_MS:-5000}
       - DISPATCH_BATCH_SIZE=${DISPATCH_BATCH_SIZE:-10}
-      - NODE_ENV=production
     depends_on:
-      migrator:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     networks:
       - route-network
     deploy:

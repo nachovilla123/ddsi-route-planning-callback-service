@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateCallbackDto {
   @ApiProperty({
-    example: 'http://host.docker.internal:3001/webhook',
+    example: 'https://api.miproyecto.com/v1/webhook',
     description: 'Nueva URL de callback',
   })
   @IsNotEmpty()

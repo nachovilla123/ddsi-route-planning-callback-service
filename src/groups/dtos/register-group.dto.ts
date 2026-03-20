@@ -8,7 +8,7 @@ export class RegisterGroupDto {
   groupName: string;
 
   @ApiProperty({
-    example: 'http://localhost:3001/webhook',
+    example: 'https://mi-dominio.com/webhook',
     description: 'URL a la que se enviaran las rutas planificadas',
   })
   @IsNotEmpty()

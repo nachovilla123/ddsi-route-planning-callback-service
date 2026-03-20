@@ -27,7 +27,7 @@ import { Throttle } from '@nestjs/throttler';
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 
-  @Post('register')
+  @Post()
   @Throttle({ default: { limit: 5, ttl: 3600000 } })
   //ttl = 3600000 ms = 1 hora, limit = 5 registros por hora para evitar abusos
   @HttpCode(201)
@@ -42,7 +42,7 @@ export class GroupsController {
     return this.groupsService.createGroup(dto);
   }
 
-  @Patch('callback')
+  @Patch('me')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(ApiKeyGuard)
   @ApiBearerAuth()
